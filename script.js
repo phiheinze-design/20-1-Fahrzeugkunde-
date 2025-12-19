@@ -15,8 +15,8 @@ function shuffleArray(array) {
 // Auslesen der Daten aus dem HTML
 function loadPieceOrderFromDOM() {
     const pieces = [];
-    // Der Selektor ist gut, aber der Aufruf muss verzögert werden!
     document.querySelectorAll('.draggable').forEach(d => {
+        // Daten aus data-Attributen und dem alt-Text auslesen
         const location = d.dataset.location;
         const name = d.querySelector('img').alt; 
         
@@ -29,7 +29,6 @@ function loadPieceOrderFromDOM() {
    return pieces;
 }
 
-
 // HINWEIS: Bitte diese Größen anpassen, falls nötig
 const locationSizes = {
     'links': { width: '1280px', height: '720px' }, 
@@ -39,7 +38,7 @@ const locationSizes = {
 	'dach': { width: '1200px', height: '448px' },
 };
 
-// Deklariere globale Variablen, initialisiere sie aber in DOMContentLoaded
+// Globale Variablen für den Programmablauf (werden in DOMContentLoaded initialisiert)
 let pieceOrder = [];
 let currentPieceIndex = 0;
 let currentPieceData = null;
@@ -70,6 +69,7 @@ function initializeDraggables() {
     if (!allDraggables || allDraggables.length === 0) return;
 
     allDraggables.forEach(d => {
+        // Speichere die initialen Styles, bevor das Skript die Positionen ändert
         d.dataset.initialLeft = d.style.left;
         d.dataset.initialTop = d.style.top;
         d.dataset.initialWidth = d.style.width;
@@ -77,7 +77,7 @@ function initializeDraggables() {
         d.draggable = true;
     });
 
-    // EVENT LISTENERS FÜR BUTTONS UND DRAG/DROP HINZUFÜGEN
+    // Event-Listener für Buttons
     choiceButtons.forEach(button => {
         button.addEventListener('click', () => {
             setLocationView(button.dataset.position);
@@ -88,7 +88,7 @@ function initializeDraggables() {
         solveButton.addEventListener('click', showSolution);
     }
     
-    // DRAG & DROP LOGIK HINZUFÜGEN (Muss neu gesetzt werden, da es in der alten Datei fehlte)
+    // DRAG & DROP LOGIK HINZUFÜGEN
     allDraggables.forEach(draggable => {
         draggable.addEventListener('dragstart', (e) => {
             if (draggable.draggable === false) { 
@@ -97,6 +97,7 @@ function initializeDraggables() {
             }
             currentDraggedElement = draggable;
             const rect = draggable.getBoundingClientRect();
+            // Offset berechnen
             offset.x = e.clientX - rect.left;
             offset.y = e.clientY - rect.top;
             e.dataTransfer.setDragImage(draggable, offset.x, offset.y); 
@@ -111,6 +112,7 @@ function initializeDraggables() {
         if (!currentDraggedElement) return;
 
         const areaRect = puzzleArea.getBoundingClientRect();
+        // Position relativ zur puzzleArea und unter Berücksichtigung des Maus-Offsets
         let dropX = e.clientX - areaRect.left - offset.x;
         let dropY = e.clientY - areaRect.top - offset.y;
 
@@ -128,9 +130,6 @@ function initializeDraggables() {
 
 // -------------------------------------------------------------
 // C. STATUS-STEUERUNG (Selection Step)
-// -------------------------------------------------------------
-// Die nachfolgenden Funktionen (startNextItemSelection, showFinishedMessage) 
-// können unverändert bleiben, da sie nun korrekt initialisiert werden.
 // -------------------------------------------------------------
 
 function startNextItemSelection() {
@@ -187,17 +186,32 @@ function showFinishedMessage() {
     
     if (finishButton) {
         finishButton.addEventListener('click', () => {
-            puzzleArea.classList.remove('hidden');
-			selectionArea.classList.add('hidden');
+            // Zeigt alle Teile an ihren korrekten Positionen an
+            showAllSolvedPieces();
         });
     }
+}
+
+// NEU: Funktion, um alle Teile an ihren Zielpositionen anzuzeigen
+function showAllSolvedPieces() {
+    selectionArea.classList.add('hidden');
+    puzzleArea.classList.remove('hidden');
+    
+    // Setzt die Ansicht auf die erste Location in der Liste (oder eine beliebige Standardansicht)
+    // Damit nicht nur eine leere Ansicht erscheint.
+    const firstLocation = pieceOrder.length > 0 ? pieceOrder[0].location : 'links';
+    setLocationView(firstLocation, true); // true signalisiert: Zeige alles gelöst an
+
+    // Aktualisiere das Zielbild für die neue Location, falls nötig
+    const bgFile = getLocationBackground(firstLocation);
+    targetImage.src = `Assets/${bgFile}`;
 }
 
 // -------------------------------------------------------------
 // D. GROBE POSITION WECHSELN/KORRIGIEREN (Zentralisierte Logik)
 // -------------------------------------------------------------
 
-function setLocationView(location) {
+function setLocationView(location, showAll = false) {
     currentViewLocation = location;
     
     let newInitialLeft = null;
@@ -209,61 +223,63 @@ function setLocationView(location) {
         newInitialLeft = `${parseInt(size.width) + 50}px`; 
     }
 
-    let bgFile = '';
-    switch (location) {
-        case 'links':
-            bgFile = 'Hintergrundbild_FahrzeugLinks.jpg';
-            break;
-        case 'rechts':
-            bgFile = 'Hintergrundbild_FahrzeugRechts.jpg';
-            break;
-		case 'hinten':
-            bgFile = 'Hintergrundbild_GR.jpg';
-            break;
-        case 'kabine':
-            bgFile = 'Hintergrundbild_FahrzeugKabine.jpg';
-            break;
-		case 'dach':
-            bgFile = 'Hintergrundbild_FahrzeugDach.jpg';
-            break;
-        default:
-            return;
-    }
+    const bgFile = getLocationBackground(location);
     targetImage.src = `Assets/${bgFile}`;
     
     allDraggables.forEach(d => {
-        const isCurrentPiece = d.id === currentPieceData.id;
+        const isCurrentPiece = d.id === currentPieceData?.id;
         const isSolved = d.classList.contains('solved');
+        const belongsToLocation = d.dataset.location === location;
 
-        if (isSolved) {
-            d.draggable = false; 
-            if (d.dataset.location === location) {
-                d.classList.remove('hidden-piece'); 
+        if (belongsToLocation) {
+            // Wenn das Teil zur aktuellen Location gehört:
+            d.classList.remove('hidden-piece');
+            
+            if (showAll || isSolved) {
+                // Bei Endanzeige ODER wenn es bereits gelöst ist: Fixiert an Ziel
+                d.draggable = false;
+                d.style.left = `${d.dataset.targetX}px`;
+                d.style.top = `${d.dataset.targetY}px`;
+            } else if (isCurrentPiece) {
+                // Das aktuelle, ungelöste Teil: Setze es in den Startbereich
+                d.draggable = true; 
+                d.style.setProperty('left', newInitialLeft || d.dataset.initialLeft, 'important');
+                d.style.setProperty('top', d.dataset.initialTop, 'important'); 
+                d.style.setProperty('z-index', '10', 'important'); 
             } else {
+                // Andere ungelöste Teile auf dieser Ansicht verstecken
                 d.classList.add('hidden-piece');
             }
-        } else if (isCurrentPiece) {
-            d.classList.remove('hidden-piece');
-            d.draggable = true; 
-            if (newInitialLeft) {
-                d.style.setProperty('left', newInitialLeft, 'important');
-            } else {
-                d.style.setProperty('left', d.dataset.initialLeft, 'important');
-            }
-            d.style.setProperty('top', d.dataset.initialTop, 'important'); 
-            d.style.setProperty('z-index', '10', 'important'); 
         } else {
+            // Teile, die nicht zur aktuellen Location gehören, immer verstecken
             d.classList.add('hidden-piece'); 
         }
     });
+    
+    // Nur bei Standortwahl wechseln
+    if (!showAll) {
+        selectionArea.classList.add('hidden');
+        puzzleArea.classList.remove('hidden');
+    }
+}
 
-    selectionArea.classList.add('hidden');
-    puzzleArea.classList.remove('hidden');
+function getLocationBackground(location) {
+    switch (location) {
+        case 'links': return 'Hintergrundbild_FahrzeugLinks.jpg';
+        case 'rechts': return 'Hintergrundbild_FahrzeugRechts.jpg';
+		case 'hinten': return 'Hintergrundbild_GR.jpg';
+        case 'kabine': return 'Hintergrundbild_FahrzeugKabine.jpg';
+		case 'dach': return 'Hintergrundbild_FahrzeugDach.jpg';
+        default: return '';
+    }
 }
 
 
 // -------------------------------------------------------------
 // E. LÖSUNGSLOGIK & checkPosition
+// -------------------------------------------------------------
+// Die nachfolgenden Funktionen (showSolution, checkPosition) 
+// können unverändert bleiben, da sie nun korrekt initialisiert werden.
 // -------------------------------------------------------------
 
 function showSolution() {
@@ -338,10 +354,9 @@ function checkPosition(element, currentX, currentY) {
     } else {
         feedbackElement.textContent = '❌ Falsche Position. Versuch es nochmal genauer.';
         feedbackElement.className = 'incorrect';
-        feedbackElement.classList.remove('hidden');
-        
         element.style.setProperty('left', element.dataset.initialLeft, 'important');
         element.style.setProperty('top', element.dataset.initialTop, 'important');
+        feedbackElement.classList.remove('hidden');
         
         setTimeout(() => {
             feedbackElement.classList.add('hidden');
@@ -354,25 +369,26 @@ function checkPosition(element, currentX, currentY) {
 // -------------------------------------------------------------
 // F. SICHERE INITIALISIERUNG (DER KRITISCHE TEIL)
 // -------------------------------------------------------------
+// Dies stellt sicher, dass das Skript erst startet, wenn die Puzzleteile existieren!
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Element-Referenzen setzen (jetzt, wo sie garantiert existieren)
+    // 1. Element-Referenzen setzen
     selectionArea = document.getElementById('selection-area');
     itemPrompt = document.getElementById('item-prompt');
     choiceButtons = document.querySelectorAll('#location-controls .choice-button'); 
     targetImage = document.getElementById('target-image');
-    feedbackElement = document.getElementById('feedback');
+    feedbackElement = document.getElementById('selection-feedback'); // Korrekte ID verwenden
     puzzleArea = document.getElementById('puzzle-area');
     itemImage = document.getElementById('item-image'); 
     solveButton = document.getElementById('solve-button');
     itemCloseupImage = document.getElementById('item-closeup-image'); 
     allDraggables = document.querySelectorAll('.draggable');
 
-    // 2. Daten laden (jetzt funktioniert es!)
+    // 2. Daten laden 
     pieceOrder = loadPieceOrderFromDOM();
     
     if (pieceOrder.length > 0) {
-        // 3. ZUFALLSGENERATOR AKTIVIEREN
+        // 3. ZUFALLSGENERATOR AKTIVIEREN (Nicht mehr auskommentiert!)
         shuffleArray(pieceOrder);
         
         // 4. Erstes Teil der Liste setzen
@@ -382,6 +398,6 @@ document.addEventListener('DOMContentLoaded', () => {
         initializeDraggables();
     } else {
         console.error("Fehler: Konnte keine Puzzleteile im HTML finden.");
-        alert("Fehler beim Laden des Spiels (Keine Puzzleteile gefunden).");
+        selectionArea.innerHTML = "<h2>Fehler beim Laden</h2><p>Es konnten keine Puzzleteile gefunden werden. Bitte die HTML-Datei prüfen.</p>";
     }
 });

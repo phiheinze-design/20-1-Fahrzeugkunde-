@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>20/1 Fahrzeugkunde</title>
-    <link rel="stylesheet" href="Assets/style.css">
+    <link rel="stylesheet" href="style.css">
     
     <style>
         /* CSS-Regeln zur Steuerung der Ansicht */
@@ -31,51 +31,17 @@
 
         /* Fügt eine bessere Trennung zwischen Bild und Buttons im Puzzle-Bereich hinzu */
         #puzzle-area #target-image {
-            max-width: 100%;
-            height: auto;
-            display: block; /* Entfernt den Platz unterhalb des Bildes */
+            margin-top: 50px; /* Platz für die überlappende Button-Leiste schaffen */
         }
-        
-        #puzzle-area {
-            position: relative; /* Wichtig für die absoluten Positionen der Draggables */
-            margin: 0 auto;
-            border: 1px solid #000;
-        }
-        
-        .draggable {
-            position: absolute; /* Muss absolut sein, um gezogen zu werden */
-            cursor: grab;
-            user-select: none; /* Verhindert Textauswahl beim Ziehen */
-        }
-        
-        .draggable img {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-        
-        .draggable.highlight-solution {
-            /* Optional: Hebt die Lösung kurz hervor */
-            box-shadow: 0 0 15px 5px rgba(0, 255, 0, 0.7);
-            border: 2px solid green;
-        }
-        
-        #item-closeup-image {
-             max-width: 400px; 
-             height: auto;
-             margin-top: 20px;
-             border: 1px solid #000;
-        }
-
     </style>
 </head>
 <body>
-
+    
 <div id="location-controls">
-    <button class="choice-button" data-position="links">Geräteraum Fahrerseite</button>
-    <button class="choice-button" data-position="rechts">Geräteraum Beifahrerseite</button>
-	<button class="choice-button" data-position="dach">Dach</button>
+    <button class="choice-button" data-position="links">Geräteraum G1, G3, G5</button>
+    <button class="choice-button" data-position="rechts">Geräteraum G2, G4, G6</button>
     <button class="choice-button" data-position="hinten">Geräteraum Heck</button>
+	<button class="choice-button" data-position="dach">Dach</button>
 	<button class="choice-button" data-position="kabine">Kabine</button>
    	
     <button id="solve-button" style="background-color: #f4b400; color: white; padding: 15px 30px; margin-left: 20px; font-size: 18px; cursor: pointer;">
@@ -87,12 +53,12 @@
         <img src="" alt="Aktuelles Teil" id="item-image">
         <h2 id="item-prompt">Wo gehört **...** hin?</h2>
 		<img id="item-closeup-image" src="" alt="Nahaufnahme" class="hidden">
-        <div id="feedback" class="hidden"></div>
+        <div id="selection-feedback" class="hidden"></div>
     </div>
 
     <div id="puzzle-area" class="hidden">
 
-<img src="Assets/Hintergrundbild_FahrzeugLinks.jpg" alt="Zielbild" id="target-image" draggable="false">
+        <img src="Assets/Hintergrundbild_FahrzeugLinks.jpg" alt="Zielbild" id="target-image" draggable="false">
 
         <div class="draggable" id="piece-1" data-location="links" data-target-x="645" data-target-y="310" style="width: 160px; height: auto; top: 50px;"> 
             <img src="Assets/G1_Reservetrupp_Flaschen.png" alt="Ersatzflaschen für Preßluftatmer + Feuerlöscher ABC + Feuerlöscher CO">
@@ -323,7 +289,7 @@
  
 		<div id="feedback" class="hidden"></div>
     	</div>
-    
-    <script src="script.js?v=1"></script> 
-    </body>
+
+    <script src="script.js"></script>
+</body>
 </html>

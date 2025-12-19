@@ -31,7 +31,7 @@ function shuffleArray(array) {
 }
 
 const pieceOrder = loadPieceOrderFromDOM();
-//shuffleArray(pieceOrder) // HIER AKTIVIEREN/DEAKTIVIEREN SIE DAS MISCHEN
+shuffleArray(pieceOrder) // HIER AKTIVIEREN/DEAKTIVIEREN SIE DAS MISCHEN
 
 // HINWEIS: Bitte diese Größen anpassen, falls nötig
 const locationSizes = {
@@ -62,12 +62,12 @@ const draggables = document.querySelectorAll('.draggable');
 const allDraggables = draggables;
 let currentDraggedElement = null;
 let offset = { x: 0, y: 0 };
-let originalX = 0; // Speichert die initiale X-Position beim Start des Zugs
-let originalY = 0; // Speichert die initiale Y-Position beim Start des Zugs
+let originalX = 0; // Wird nicht mehr in der drag-Funktion verwendet, aber für endDrag beibehalten
+let originalY = 0; // Wird nicht mehr in der drag-Funktion verwendet, aber für endDrag beibehalten
 
 
 // -------------------------------------------------------------
-// B. HILFSFUNKTIONEN ZUM SPEICHERN DER STARTSTYLES
+// B. HILFSFUNKTIONEN ZUM SPEICHERN DER STARTSTYLES & INITIALISIERUNG
 // -------------------------------------------------------------
 function initializeDraggables() {
     allDraggables.forEach(d => {
@@ -87,8 +87,8 @@ function initializeDraggables() {
         // MAUS-EVENTS (für PC)
         draggable.addEventListener('mousedown', startDrag);
         
-        // TOUCH-EVENTS HINZUFÜGEN (für Handy/Tablet)
-        draggable.addEventListener('touchstart', startDrag, { passive: true });
+        // TOUCH-EVENTS: passive: false ist entscheidend, damit e.preventDefault() das Standard-Scrollen blockiert
+        draggable.addEventListener('touchstart', startDrag, { passive: false }); 
     });
 
     document.addEventListener('mousemove', drag);
@@ -133,7 +133,8 @@ function startNextItemSelection() {
         itemImage.style.width = currentDraggableElement.dataset.initialWidth || currentDraggableElement.style.width;
         itemImage.style.height = currentDraggableElement.dataset.initialHeight || currentDraggableElement.style.height;
        
-        const closeupSource = currentDraggableElement.dataset.closeupsrc; // Liest das Attribut aus
+        // Lese das Attribut: Nutze dataset.closeupsrc (CamelCase)
+        const closeupSource = currentDraggableElement.dataset.closeupsrc; 
 		
         if (itemCloseupImage) {
             if (closeupSource) {
@@ -174,12 +175,12 @@ function showFinishedMessage() {
 // -------------------------------------------------------------
 
 function startDrag(e) {
-    // Verhindert Standard-Browserverhalten (z.B. Ziehen des Bildes)
+    // Verhindert Standard-Browserverhalten (z.B. Kontextmenü/Scrollen)
     e.preventDefault(); 
     
     if (e.target.closest('.draggable') && e.target.closest('.draggable').draggable) {
         
-        // 🚀 NEU: E_XTR-AKTION DER K_OORDINATEN (für Maus oder Touch)
+        // KORREKTES AUSLESEN DER KOORDINATEN (für Maus oder Touch)
         const clientX = e.touches ? e.touches[0].clientX : e.clientX; 
         const clientY = e.touches ? e.touches[0].clientY : e.clientY; 
         
@@ -189,12 +190,13 @@ function startDrag(e) {
         const rect = currentDraggedElement.getBoundingClientRect();
         
         // Speichert den Abstand zwischen Maus/Finger und der linken oberen Ecke des Elements
+        // Dies ist der entscheidende Wert für die robuste drag-Funktion
         offset = {
             x: clientX - rect.left,
             y: clientY - rect.top
         };
         
-        // Speichert die Originalposition des Mauszeigers/Fingers
+        // originalX/Y nur für die endDrag-Funktion nötig, um nicht undefined zu sein
         originalX = clientX;
         originalY = clientY;
     }
@@ -203,31 +205,37 @@ function startDrag(e) {
 function drag(e) {
     if (!currentDraggedElement) return;
 
-    // 🚀 NEU: E_XTR-AKTION DER K_OORDINATEN (für Maus oder Touch)
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX; 
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY; 
-    
     // Verhindert das Scrollen auf Touch-Geräten, während gezogen wird
     e.preventDefault(); 
     
-    // Neue Position des Elements berechnen
-    const newLeft = clientX - offset.x;
-    const newTop = clientY - offset.y;
+    // KORREKTES AUSLESEN DER KOORDINATEN (für Maus oder Touch)
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX; 
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY; 
     
-    // WICHTIG: Die Position muss relativ zum Elternelement (puzzleArea) sein.
+    // 🚀 NEUE ROBUSTE LOGIK:
+    // 1. Neue Position relativ zum Viewport (Fenster) berechnen
+    const viewportLeft = clientX - offset.x;
+    const viewportTop = clientY - offset.y;
+    
+    // 2. Position des Elternelements (puzzleArea) holen
     const parentRect = puzzleArea.getBoundingClientRect();
     
-    // Setze die absolute Position relativ zum Elternelement
-    currentDraggedElement.style.left = `${newLeft - parentRect.left}px`;
-    currentDraggedElement.style.top = `${newTop - parentRect.top}px`;
+    // 3. Neue Position relativ zum Elternelement berechnen (Absolute Viewport-Position minus Eltern-Offset)
+    const newLeft = viewportLeft - parentRect.left;
+    const newTop = viewportTop - parentRect.top;
+
+    currentDraggedElement.style.left = `${newLeft}px`;
+    currentDraggedElement.style.top = `${newTop}px`;
+    
+    // WICHTIG: originalX und originalY NICHT in drag updaten, da wir nicht mehr mit Deltas arbeiten.
 }
 
 function endDrag(e) {
     if (!currentDraggedElement) return;
 
-    // 🚀 NEU: E_XTR-AKTION DER K_OORDINATEN (für Maus oder Touch)
-    const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
-    const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+    // e.changedTouches[0] wird bei 'touchend' verwendet
+    // const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+    // const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
 
     const piece = currentDraggedElement;
     currentDraggedElement.style.setProperty('z-index', '10', 'important');
@@ -268,8 +276,6 @@ function endDrag(e) {
         // FALSCHE POSITION: Element an die Startposition zurücksetzen
         
         // Startposition relativ zur Puzzle-Area berechnen
-        // Hinweis: newInitialLeft ist nur in setLocationView berechnet!
-        // Wir nutzen die gespeicherten initialen Werte
         const initialLeft = piece.dataset.initialLeft;
         const initialTop = piece.dataset.initialTop;
         
@@ -306,7 +312,7 @@ function setLocationView(location) {
         puzzleArea.style.width = size.width; 
         puzzleArea.style.height = size.height;
         
-        // 🚀 NEU: Dynamische Left-Berechnung
+        // NEU: Dynamische Left-Berechnung
         // 1. Breite des Containers ermitteln (z.B. 500)
         const areaWidthPx = parseInt(size.width); 
         // 2. Neue Startposition berechnen (Breite + 50px Abstand)

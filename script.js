@@ -4,7 +4,15 @@
 // Programmierer: Philipp Heinze, Feuerwehr Stadtlauringen, phi.heinze@gmail.com
 
 
-// Auslesen der Daten aus dem HTML
+// HILFSFUNKTION: Fisher-Yates (Knut) Shuffle Algorithmus
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
+
+// Auslesen der Daten aus dem HTML (Wird erst nach DOMContentLoaded aufgerufen!)
 function loadPieceOrderFromDOM() {
     const pieces = [];
     document.querySelectorAll('.draggable').forEach(d => {
@@ -22,17 +30,6 @@ function loadPieceOrderFromDOM() {
    return pieces;
 }
 
-// HILFSFUNKTION: Fisher-Yates (Knut) Shuffle Algorithmus
-function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-}
-
-const pieceOrder = loadPieceOrderFromDOM();
-shuffleArray(pieceOrder) // HIER AKTIVIEREN/DEAKTIVIEREN SIE DAS MISCHEN
-
 // HINWEIS: Bitte diese Größen anpassen, falls nötig
 const locationSizes = {
     'links': { width: '1280px', height: '720px' }, 
@@ -42,28 +39,29 @@ const locationSizes = {
 	'dach': { width: '1200px', height: '448px' },
 };
 
+// Globale Variablen für den Programmablauf (werden in DOMContentLoaded initialisiert)
+let pieceOrder = [];
 let currentPieceIndex = 0;
-let currentPieceData = pieceOrder[currentPieceIndex];
+let currentPieceData = null;
 let currentViewLocation = null; 
 
-// Referenzen zu den HTML-Elementen
-const selectionArea = document.getElementById('selection-area');
-const itemPrompt = document.getElementById('item-prompt');
-const choiceButtons = document.querySelectorAll('#location-controls .choice-button'); 
-const targetImage = document.getElementById('target-image');
-const feedbackElement = document.getElementById('feedback');
-const puzzleArea = document.getElementById('puzzle-area');
-const itemImage = document.getElementById('item-image'); 
-const solveButton = document.getElementById('solve-button');
-const itemCloseupImage = document.getElementById('item-closeup-image'); 
+// Referenzen zu den HTML-Elementen (werden in DOMContentLoaded gesetzt)
+let selectionArea;
+let itemPrompt;
+let choiceButtons; 
+let targetImage;
+let feedbackElement;
+let puzzleArea;
+let itemImage; 
+let solveButton;
+let itemCloseupImage; 
 
 // Drag-and-Drop Variablen
-const draggables = document.querySelectorAll('.draggable');
-const allDraggables = draggables;
+let allDraggables;
 let currentDraggedElement = null;
 let offset = { x: 0, y: 0 };
-let originalX = 0; // Wird nicht mehr in der drag-Funktion verwendet, aber für endDrag beibehalten
-let originalY = 0; // Wird nicht mehr in der drag-Funktion verwendet, aber für endDrag beibehalten
+let originalX = 0; 
+let originalY = 0; 
 
 
 // -------------------------------------------------------------
@@ -87,7 +85,7 @@ function initializeDraggables() {
         // MAUS-EVENTS (für PC)
         draggable.addEventListener('mousedown', startDrag);
         
-        // TOUCH-EVENTS: passive: false ist entscheidend, damit e.preventDefault() das Standard-Scrollen blockiert
+        // TOUCH-EVENTS: passive: false ist entscheidend für mobiles Dragging
         draggable.addEventListener('touchstart', startDrag, { passive: false }); 
     });
 
@@ -98,6 +96,20 @@ function initializeDraggables() {
     document.addEventListener('touchmove', drag, { passive: false });
     document.addEventListener('touchend', endDrag);
     // ----------------------------------------------------------------------------------
+    
+    // G. EVENT LISTENERS
+    // Klicks auf die Standort-Buttons (Muss HIER initialisiert werden, da choiceButtons jetzt definiert ist)
+    choiceButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            setLocationView(button.dataset.position);
+        });
+    });
+
+    // NEU: Klick auf den Lösungs-Button
+    if (solveButton) {
+        solveButton.addEventListener('click', showSolution);
+    }
+
 
     startNextItemSelection();
 }
@@ -190,7 +202,6 @@ function startDrag(e) {
         const rect = currentDraggedElement.getBoundingClientRect();
         
         // Speichert den Abstand zwischen Maus/Finger und der linken oberen Ecke des Elements
-        // Dies ist der entscheidende Wert für die robuste drag-Funktion
         offset = {
             x: clientX - rect.left,
             y: clientY - rect.top
@@ -212,7 +223,7 @@ function drag(e) {
     const clientX = e.touches ? e.touches[0].clientX : e.clientX; 
     const clientY = e.touches ? e.touches[0].clientY : e.clientY; 
     
-    // 🚀 NEUE ROBUSTE LOGIK:
+    // NEUE ROBUSTE LOGIK:
     // 1. Neue Position relativ zum Viewport (Fenster) berechnen
     const viewportLeft = clientX - offset.x;
     const viewportTop = clientY - offset.y;
@@ -226,16 +237,10 @@ function drag(e) {
 
     currentDraggedElement.style.left = `${newLeft}px`;
     currentDraggedElement.style.top = `${newTop}px`;
-    
-    // WICHTIG: originalX und originalY NICHT in drag updaten, da wir nicht mehr mit Deltas arbeiten.
 }
 
 function endDrag(e) {
     if (!currentDraggedElement) return;
-
-    // e.changedTouches[0] wird bei 'touchend' verwendet
-    // const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
-    // const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
 
     const piece = currentDraggedElement;
     currentDraggedElement.style.setProperty('z-index', '10', 'important');
@@ -267,6 +272,7 @@ function endDrag(e) {
         // Gehe zur nächsten Aufgabe
         currentPieceIndex++;
         setTimeout(() => {
+            piece.classList.remove('highlight-solution')
             feedbackElement.classList.add('hidden');
             feedbackElement.classList.remove('correct');
             startNextItemSelection();
@@ -417,22 +423,33 @@ function showSolution() {
     }, 1500);
 }
 
+
 // -------------------------------------------------------------
-// G. EVENT LISTENERS
+// G. START: SICHERE INITIALISIERUNG
 // -------------------------------------------------------------
-// Klicks auf die Standort-Buttons
-choiceButtons.forEach(button => {
-    button.addEventListener('click', () => {
-        setLocationView(button.dataset.position);
-    });
+
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Referenzen zu den HTML-Elementen setzen (jetzt, wo sie garantiert existieren)
+    selectionArea = document.getElementById('selection-area');
+    itemPrompt = document.getElementById('item-prompt');
+    choiceButtons = document.querySelectorAll('#location-controls .choice-button'); 
+    targetImage = document.getElementById('target-image');
+    feedbackElement = document.getElementById('feedback');
+    puzzleArea = document.getElementById('puzzle-area');
+    itemImage = document.getElementById('item-image'); 
+    solveButton = document.getElementById('solve-button');
+    itemCloseupImage = document.getElementById('item-closeup-image'); 
+    allDraggables = document.querySelectorAll('.draggable');
+
+    // 2. Daten laden (jetzt, wo die Elemente garantiert existieren)
+    pieceOrder = loadPieceOrderFromDOM();
+    
+    // 3. ZUFALLSGENERATOR AKTIVIEREN
+    shuffleArray(pieceOrder);
+    
+    // 4. Erstes Teil der Liste setzen
+    currentPieceData = pieceOrder[currentPieceIndex];
+
+    // 5. Initialisierung starten
+    initializeDraggables();
 });
-
-// NEU: Klick auf den Lösungs-Button
-if (solveButton) {
-    solveButton.addEventListener('click', showSolution);
-}
-
-// -------------------------------------------------------------
-// H. START
-// -------------------------------------------------------------
-initializeDraggables();

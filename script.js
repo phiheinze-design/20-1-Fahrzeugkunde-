@@ -31,7 +31,7 @@ function shuffleArray(array) {
 }
 
 const pieceOrder = loadPieceOrderFromDOM();
-//shuffleArray(pieceOrder)
+//shuffleArray(pieceOrder) // HIER AKTIVIEREN/DEAKTIVIEREN SIE DAS MISCHEN
 
 // HINWEIS: Bitte diese Größen anpassen, falls nötig
 const locationSizes = {
@@ -55,13 +55,15 @@ const feedbackElement = document.getElementById('feedback');
 const puzzleArea = document.getElementById('puzzle-area');
 const itemImage = document.getElementById('item-image'); 
 const solveButton = document.getElementById('solve-button');
-const itemCloseupImage = document.getElementById('item-closeup-image'); // <--- DIESE ZEILE HINZUFÜGEN
+const itemCloseupImage = document.getElementById('item-closeup-image'); 
 
 // Drag-and-Drop Variablen
 const draggables = document.querySelectorAll('.draggable');
 const allDraggables = draggables;
 let currentDraggedElement = null;
 let offset = { x: 0, y: 0 };
+let originalX = 0; // Speichert die initiale X-Position beim Start des Zugs
+let originalY = 0; // Speichert die initiale Y-Position beim Start des Zugs
 
 
 // -------------------------------------------------------------
@@ -70,17 +72,33 @@ let offset = { x: 0, y: 0 };
 function initializeDraggables() {
     allDraggables.forEach(d => {
         // Wir speichern nur TOP und Breite/Höhe, da LEFT dynamisch berechnet wird
-        d.dataset.initialLeft = d.style.left; // Nur als Fallback/Referenz
+        d.dataset.initialLeft = d.style.left; 
         d.dataset.initialTop = d.style.top;
         d.dataset.initialWidth = d.style.width;
         d.dataset.initialHeight = d.style.height;
         
         d.draggable = true; 
     });
-	//showAllSolutions('links');
-	//showAllSolutions('rechts');
-	//showAllSolutions('kabine');
-	//showAllSolutions('hinten');
+    
+    // ----------------------------------------------------------------------------------
+    // HINZUFÜGEN DER DRAG-EVENT-LISTENER (für PC und Mobil)
+    // ----------------------------------------------------------------------------------
+    allDraggables.forEach(draggable => {
+        // MAUS-EVENTS (für PC)
+        draggable.addEventListener('mousedown', startDrag);
+        
+        // TOUCH-EVENTS HINZUFÜGEN (für Handy/Tablet)
+        draggable.addEventListener('touchstart', startDrag, { passive: true });
+    });
+
+    document.addEventListener('mousemove', drag);
+    document.addEventListener('mouseup', endDrag);
+
+    // TOUCH-EVENTS FÜR DEN GESAMTEN BILDSCHIRM HINZUFÜGEN
+    document.addEventListener('touchmove', drag, { passive: false });
+    document.addEventListener('touchend', endDrag);
+    // ----------------------------------------------------------------------------------
+
     startNextItemSelection();
 }
 
@@ -106,7 +124,7 @@ function startNextItemSelection() {
     
     allDraggables.forEach(d => d.classList.add('hidden-piece'));
 
-const currentDraggableElement = document.getElementById(currentPieceData.id);
+    const currentDraggableElement = document.getElementById(currentPieceData.id);
     if (currentDraggableElement) {
         const imageSource = currentDraggableElement.querySelector('img').src;
         itemImage.src = imageSource;
@@ -115,19 +133,18 @@ const currentDraggableElement = document.getElementById(currentPieceData.id);
         itemImage.style.width = currentDraggableElement.dataset.initialWidth || currentDraggableElement.style.width;
         itemImage.style.height = currentDraggableElement.dataset.initialHeight || currentDraggableElement.style.height;
        
-        const closeupSource = currentDraggableElement.dataset.closeupsrc; // Liest das neue Attribut aus
+        const closeupSource = currentDraggableElement.dataset.closeupsrc; // Liest das Attribut aus
 		
         if (itemCloseupImage) {
             if (closeupSource) {
                  itemCloseupImage.src = closeupSource;
                  itemCloseupImage.alt = `Nahaufnahme von ${currentPieceData.name}`;
-                 itemCloseupImage.classList.remove('hidden'); // Macht das Bild sichtbar (entfernt die 'hidden' Klasse)
+                 itemCloseupImage.classList.remove('hidden'); // Macht das Bild sichtbar
             } else {
                  itemCloseupImage.src = '';
                  itemCloseupImage.classList.add('hidden'); // Versteckt das Bild, falls kein Pfad vorhanden
             }
         }
-        // Ende NEU
     }
 }
 
@@ -153,9 +170,129 @@ function showFinishedMessage() {
 }
 
 // -------------------------------------------------------------
-// D. GROBE POSITION WECHSELN/KORRIGIEREN (Zentralisierte Logik)
+// D. DRAG-AND-DROP FUNKTIONEN
 // -------------------------------------------------------------
 
+function startDrag(e) {
+    // Verhindert Standard-Browserverhalten (z.B. Ziehen des Bildes)
+    e.preventDefault(); 
+    
+    if (e.target.closest('.draggable') && e.target.closest('.draggable').draggable) {
+        
+        // 🚀 NEU: E_XTR-AKTION DER K_OORDINATEN (für Maus oder Touch)
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX; 
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY; 
+        
+        currentDraggedElement = e.target.closest('.draggable');
+        currentDraggedElement.style.setProperty('z-index', '20', 'important'); // Element in den Vordergrund bringen
+
+        const rect = currentDraggedElement.getBoundingClientRect();
+        
+        // Speichert den Abstand zwischen Maus/Finger und der linken oberen Ecke des Elements
+        offset = {
+            x: clientX - rect.left,
+            y: clientY - rect.top
+        };
+        
+        // Speichert die Originalposition des Mauszeigers/Fingers
+        originalX = clientX;
+        originalY = clientY;
+    }
+}
+
+function drag(e) {
+    if (!currentDraggedElement) return;
+
+    // 🚀 NEU: E_XTR-AKTION DER K_OORDINATEN (für Maus oder Touch)
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX; 
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY; 
+    
+    // Verhindert das Scrollen auf Touch-Geräten, während gezogen wird
+    e.preventDefault(); 
+    
+    // Neue Position des Elements berechnen
+    const newLeft = clientX - offset.x;
+    const newTop = clientY - offset.y;
+    
+    // WICHTIG: Die Position muss relativ zum Elternelement (puzzleArea) sein.
+    const parentRect = puzzleArea.getBoundingClientRect();
+    
+    // Setze die absolute Position relativ zum Elternelement
+    currentDraggedElement.style.left = `${newLeft - parentRect.left}px`;
+    currentDraggedElement.style.top = `${newTop - parentRect.top}px`;
+}
+
+function endDrag(e) {
+    if (!currentDraggedElement) return;
+
+    // 🚀 NEU: E_XTR-AKTION DER K_OORDINATEN (für Maus oder Touch)
+    const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+    const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+
+    const piece = currentDraggedElement;
+    currentDraggedElement.style.setProperty('z-index', '10', 'important');
+    
+    // K_OORDINATEN DES ZIELS HOLEN
+    const targetX = parseInt(piece.dataset.targetX);
+    const targetY = parseInt(piece.dataset.targetY);
+    
+    // K_OORDINATEN DES AKTUELLEN TEILS HOLEN
+    const currentLeft = parseInt(piece.style.left);
+    const currentTop = parseInt(piece.style.top);
+    
+    // ABSTAND BERECHNEN (Toleranz 40 Pixel)
+    const tolerance = 40; 
+    const isXCorrect = Math.abs(currentLeft - targetX) < tolerance;
+    const isYCorrect = Math.abs(currentTop - targetY) < tolerance;
+
+    if (isXCorrect && isYCorrect) {
+        // KORREKTE POSITION
+        piece.style.left = `${targetX}px`;
+        piece.style.top = `${targetY}px`;
+        piece.classList.add('solved');
+        piece.draggable = false;
+        
+        feedbackElement.textContent = `✅ Korrekt platziert: ${currentPieceData.name}`;
+        feedbackElement.className = 'correct';
+        feedbackElement.classList.remove('hidden');
+
+        // Gehe zur nächsten Aufgabe
+        currentPieceIndex++;
+        setTimeout(() => {
+            feedbackElement.classList.add('hidden');
+            feedbackElement.classList.remove('correct');
+            startNextItemSelection();
+        }, 1500);
+
+    } else {
+        // FALSCHE POSITION: Element an die Startposition zurücksetzen
+        
+        // Startposition relativ zur Puzzle-Area berechnen
+        // Hinweis: newInitialLeft ist nur in setLocationView berechnet!
+        // Wir nutzen die gespeicherten initialen Werte
+        const initialLeft = piece.dataset.initialLeft;
+        const initialTop = piece.dataset.initialTop;
+        
+        piece.style.setProperty('left', initialLeft, 'important'); 
+        piece.style.setProperty('top', initialTop, 'important'); 
+
+        feedbackElement.textContent = `❌ Nicht korrekt. Probiere es weiter oder zeige die Lösung an.`;
+        feedbackElement.className = 'incorrect';
+        feedbackElement.classList.remove('hidden');
+
+        setTimeout(() => {
+            feedbackElement.classList.add('hidden');
+            feedbackElement.classList.remove('incorrect');
+        }, 1500);
+    }
+    
+    currentDraggedElement = null;
+}
+
+
+// -------------------------------------------------------------
+// E. GROBE POSITION WECHSELN/KORRIGIEREN (Zentralisierte Logik)
+// -------------------------------------------------------------
 
 
 function setLocationView(location) {
@@ -212,27 +349,24 @@ function setLocationView(location) {
             } else {
                 d.classList.add('hidden-piece');
             }
-            
         } else if (isCurrentPiece) {
             // Das AKTUELLE, UNGELÖSTE Teil:
             d.classList.remove('hidden-piece');
-            d.draggable = true; 
-
+            d.draggable = true;
+            
             // Setze Position zurück (Dynamisch für Left, statisch für Top)
             if (newInitialLeft) {
-                // 🚀 HIER: Dynamische Left-Position anwenden
+                // HIER: Dynamische Left-Position anwenden
                 d.style.setProperty('left', newInitialLeft, 'important');
             } else {
                 // Fallback auf den ursprünglichen HTML-Wert
                 d.style.setProperty('left', d.dataset.initialLeft, 'important');
             }
-            
-            d.style.setProperty('top', d.dataset.initialTop, 'important'); 
-            d.style.setProperty('z-index', '10', 'important'); 
-
+            d.style.setProperty('top', d.dataset.initialTop, 'important');
+            d.style.setProperty('z-index', '10', 'important');
         } else {
             // Verstecke alle anderen (ungelösten, nicht aktuellen) Teile
-            d.classList.add('hidden-piece'); 
+            d.classList.add('hidden-piece');
         }
     });
 
@@ -243,49 +377,43 @@ function setLocationView(location) {
 
 
 // -------------------------------------------------------------
-// E. LÖSUNGSLOGIK
+// F. LÖSUNGSLOGIK
 // -------------------------------------------------------------
-
 function showSolution() {
     const piece = document.getElementById(currentPieceData.id);
     if (!piece) return;
 
     // 1. Wechsel zur korrekten Ansicht, falls nicht schon geschehen
-    setLocationView(currentPieceData.location);
+    setLocationView(currentPieceData.location); 
 
     // 2. Element an die korrekte Zielposition setzen
-    const targetX = parseInt(piece.dataset.targetX); 
+    const targetX = parseInt(piece.dataset.targetX);
     const targetY = parseInt(piece.dataset.targetY);
-
     piece.style.left = `${targetX}px`;
     piece.style.top = `${targetY}px`;
     piece.draggable = false;
-    
     piece.classList.add('solved');
-    piece.classList.remove('hidden-piece'); 
+    piece.classList.remove('hidden-piece');
     piece.classList.add('highlight-solution');
 
     // 3. Feedback anzeigen
     feedbackElement.textContent = '✅ Lösung angezeigt.';
     feedbackElement.className = 'correct';
     feedbackElement.classList.remove('hidden');
-    
+
     // 4. Gehe zur nächsten Aufgabe
     currentPieceIndex++;
-    
     setTimeout(() => {
-	piece.classList.remove('highlight-solution')
+        piece.classList.remove('highlight-solution')
         feedbackElement.classList.add('hidden');
         feedbackElement.classList.remove('correct');
-        startNextItemSelection(); 
+        startNextItemSelection();
     }, 1500);
 }
 
-
 // -------------------------------------------------------------
-// F. EVENT LISTENERS
+// G. EVENT LISTENERS
 // -------------------------------------------------------------
-
 // Klicks auf die Standort-Buttons
 choiceButtons.forEach(button => {
     button.addEventListener('click', () => {
@@ -298,184 +426,7 @@ if (solveButton) {
     solveButton.addEventListener('click', showSolution);
 }
 
-
 // -------------------------------------------------------------
-// G. DRAG & DROP LOGIK
+// H. START
 // -------------------------------------------------------------
-
-draggables.forEach(draggable => {
-    draggable.addEventListener('dragstart', (e) => {
-        
-        // Verhindere das Ziehen basierend auf der 'draggable'-Eigenschaft
-        if (draggable.draggable === false) { 
-             e.preventDefault(); 
-             return;
-        }
-
-        currentDraggedElement = draggable;
-        const rect = draggable.getBoundingClientRect();
-        offset.x = e.clientX - rect.left;
-        offset.y = e.clientY - rect.top;
-	e.dataTransfer.setDragImage(draggable, offset.x, offset.y); 
-
-        // Nur für die Drag-API: Daten setzen (kann leer sein, aber muss sein)
-        e.dataTransfer.setData('text/plain', draggable.id);
-        draggable.classList.add('is-dragging'); 
-    });
-});
-
-puzzleArea.addEventListener('dragover', (e) => {
-    e.preventDefault(); 
-});
-
-puzzleArea.addEventListener('drop', (e) => {
-    e.preventDefault();
-    if (!currentDraggedElement) return;
-
-    const areaRect = puzzleArea.getBoundingClientRect();
-    let dropX = e.clientX - areaRect.left - offset.x;
-    let dropY = e.clientY - areaRect.top - offset.y;
-
-    currentDraggedElement.style.left = `${dropX}px`;
-    currentDraggedElement.style.top = `${dropY}px`;
-    currentDraggedElement.classList.remove('is-dragging');
-    
-    checkPosition(currentDraggedElement, dropX, dropY);
-    
-    currentDraggedElement = null; 
-});
-
-
-// -------------------------------------------------------------
-// H. FEINPOSITION PRÜFEN (checkPosition)
-// -------------------------------------------------------------
-
-function checkPosition(element, currentX, currentY) {
-
-    if (currentViewLocation !== currentPieceData.location) {
-        // Falscher Hintergrund gewählt! 
-        feedbackElement.textContent = `❌ Falsch. Das Teil gehört nicht in den Bereich **${currentViewLocation.toUpperCase()}**.`;
-        feedbackElement.className = 'incorrect';
-        feedbackElement.classList.remove('hidden');
-        
-        // Element zur Startposition zurücksetzen
-        element.style.setProperty('left', element.dataset.initialLeft, 'important');
-        element.style.setProperty('top', element.dataset.initialTop, 'important');
-        
-        setTimeout(() => {
-            feedbackElement.classList.add('hidden');
-            feedbackElement.classList.remove('incorrect');
-        }, 3000); 
-        return; 
-    }
-    
-    // --- Wenn die Location KORREKT ist, prüfe die Feinposition ---
-    const targetX = parseInt(element.dataset.targetX); 
-    const targetY = parseInt(element.dataset.targetY);
-    const tolerance = 100; 
-
-
-    console.log(`--- KOORDINATEN FÜR ${element.id} ---`);
-    console.log(`data-target-x="${Math.round(currentX)}"`);
-    console.log(`data-target-y="${Math.round(currentY)}"`);
-    console.log('------------------------------------------------');
-    // ----------------------------------------------------
-
-    const isCorrectX = Math.abs(currentX - targetX) < tolerance;
-    const isCorrectY = Math.abs(currentY - targetY) < tolerance;
-
-    if (isCorrectX && isCorrectY) {
-        // POSITIVES Feedback & Einrasten (Location und Position sind richtig)
-        feedbackElement.textContent = '🎉 Richtig! Gut gemacht.';
-        feedbackElement.className = 'correct';
-        feedbackElement.classList.remove('hidden');
-        
-        element.style.left = `${targetX}px`;
-        element.style.top = `${targetY}px`;
-        element.draggable = false; 
-        
-        element.classList.add('solved');
-        
-        currentPieceIndex++;
-        
-        setTimeout(() => {
-            feedbackElement.classList.add('hidden');
-            feedbackElement.classList.remove('correct');
-            startNextItemSelection(); 
-        }, 1500); 
-
-    } else {
-        // NEGATIVES Feedback (Location ist richtig, aber Position ist falsch)
-        feedbackElement.textContent = '❌ Falsche Position. Versuch es nochmal genauer.';
-        feedbackElement.className = 'incorrect';
-        feedbackElement.classList.remove('hidden');
-        
-        // Element zur Startposition zurücksetzen (Verwendet nun initialTop/Left)
-        element.style.setProperty('left', element.dataset.initialLeft, 'important');
-        element.style.setProperty('top', element.dataset.initialTop, 'important');
-        
-        setTimeout(() => {
-            feedbackElement.classList.add('hidden');
-            feedbackElement.classList.remove('incorrect');
-        }, 1500);
-    }
-}
-
-
-// -------------------------------------------------------------
-// E. DEBUG-FUNKTION (DIE GEWÜNSCHTE GESAMTLÖSUNG)
-// -------------------------------------------------------------
-
-/**
- * Zeigt alle Puzzleteile für eine bestimmte Location an ihren Zielkoordinaten an.
- * Dies ist ein reines Debugging-Tool für die Programmerstellung.
- * @param {string} locationToShow - Die Location, deren Lösung angezeigt werden soll (z.B. 'links', 'kabine').
- */
-function showAllSolutions(locationToShow) {
-    if (!locationToShow) {
-        console.error("⛔ Bitte geben Sie die Location an, z.B. showAllSolutions('links')");
-        return;
-    }
-
-    // 1. Setze die Ansicht auf die gewünschte Location (Hintergrund und Containergröße)
-    setLocationView(locationToShow);
-    selectionArea.classList.add('hidden');
-    puzzleArea.classList.remove('hidden');
-
-    // 2. Iteriere über alle Puzzleteile und platziere sie
-    document.querySelectorAll('.draggable').forEach(element => {
-        // Prüfe, ob das Teil zur aktuellen Location gehört
-        if (element.dataset.location === locationToShow) {
-            const targetX = parseInt(element.dataset.targetX);
-            const targetY = parseInt(element.dataset.targetY);
-
-            // Mache das Teil sichtbar
-            element.classList.remove('hidden-piece');
-            
-            // Setze die korrekte Position
-            element.style.left = `${targetX}px`;
-            element.style.top = `${targetY}px`;
-            
-            // Stelle sicher, dass die korrekte Größe verwendet wird (aus den initial gespeicherten Werten)
-            element.style.width = element.dataset.initialWidth;
-            element.style.height = element.dataset.initialHeight;
-            
-            // Markiere als gelöst und deaktiviere Dragging
-            element.classList.add('solved');
-            element.draggable = false;
-        } else {
-            // Teile, die nicht zur aktuellen Location gehören, verstecken
-            element.classList.add('hidden-piece');
-        }
-    });
-
-    console.log(`✅ Alle Teile für Location '${locationToShow}' wurden an ihren Zielpositionen platziert.`);
-}
-
-
-// -------------------------------------------------------------
-// F. START
-// -------------------------------------------------------------
-initializeDraggables();
-
 initializeDraggables();

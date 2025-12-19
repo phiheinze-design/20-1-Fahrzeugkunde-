@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>20/1 Fahrzeugkunde</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="Assets/style.css">
     
     <style>
         /* CSS-Regeln zur Steuerung der Ansicht */
@@ -31,17 +31,51 @@
 
         /* Fügt eine bessere Trennung zwischen Bild und Buttons im Puzzle-Bereich hinzu */
         #puzzle-area #target-image {
-            margin-top: 50px; /* Platz für die überlappende Button-Leiste schaffen */
+            max-width: 100%;
+            height: auto;
+            display: block; /* Entfernt den Platz unterhalb des Bildes */
         }
+        
+        #puzzle-area {
+            position: relative; /* Wichtig für die absoluten Positionen der Draggables */
+            margin: 0 auto;
+            border: 1px solid #000;
+        }
+        
+        .draggable {
+            position: absolute; /* Muss absolut sein, um gezogen zu werden */
+            cursor: grab;
+            user-select: none; /* Verhindert Textauswahl beim Ziehen */
+        }
+        
+        .draggable img {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        .draggable.highlight-solution {
+            /* Optional: Hebt die Lösung kurz hervor */
+            box-shadow: 0 0 15px 5px rgba(0, 255, 0, 0.7);
+            border: 2px solid green;
+        }
+        
+        #item-closeup-image {
+             max-width: 400px; 
+             height: auto;
+             margin-top: 20px;
+             border: 1px solid #000;
+        }
+
     </style>
 </head>
 <body>
-    
+
 <div id="location-controls">
-    <button class="choice-button" data-position="links">Geräteraum G1, G3, G5</button>
-    <button class="choice-button" data-position="rechts">Geräteraum G2, G4, G6</button>
-    <button class="choice-button" data-position="hinten">Geräteraum Heck</button>
+    <button class="choice-button" data-position="links">Geräteraum Fahrerseite</button>
+    <button class="choice-button" data-position="rechts">Geräteraum Beifahrerseite</button>
 	<button class="choice-button" data-position="dach">Dach</button>
+    <button class="choice-button" data-position="hinten">Geräteraum Heck</button>
 	<button class="choice-button" data-position="kabine">Kabine</button>
    	
     <button id="solve-button" style="background-color: #f4b400; color: white; padding: 15px 30px; margin-left: 20px; font-size: 18px; cursor: pointer;">
@@ -53,243 +87,35 @@
         <img src="" alt="Aktuelles Teil" id="item-image">
         <h2 id="item-prompt">Wo gehört **...** hin?</h2>
 		<img id="item-closeup-image" src="" alt="Nahaufnahme" class="hidden">
-        <div id="selection-feedback" class="hidden"></div>
+        <div id="feedback" class="hidden"></div>
     </div>
 
     <div id="puzzle-area" class="hidden">
 
         <img src="Assets/Hintergrundbild_FahrzeugLinks.jpg" alt="Zielbild" id="target-image" draggable="false">
-
-        <div class="draggable" id="piece-1" data-location="links" data-target-x="645" data-target-y="310" style="width: 160px; height: auto; top: 50px;"> 
-            <img src="Assets/G1_Reservetrupp_Flaschen.png" alt="Ersatzflaschen für Preßluftatmer + Feuerlöscher ABC + Feuerlöscher CO">
+			
+        <div class="draggable hidden-piece" id="piece-1" data-location="rechts" data-target-x="1140" data-target-y="410" style="width: 60px; height: auto; top: 50px;" data-closeup-src="Assets/GR_B-Schlauch5m.jpg">
+            <img src="Assets/GR_B-Schlauch5m.jpg" alt="B-Schlauch 5m">
         </div>
-		
-		<div class="draggable hidden-piece" id="piece-2" data-location="links" data-target-x="140" data-target-y="550" style="width: 250px; height: auto; top: 50px;">
-            <img src="Assets/G1_SchereSpreizer.jpg" alt="Hydraulischer Rettungssatz">
-        </div>
-		
-       <div class="draggable hidden-piece" id="piece-3" data-location="rechts" data-target-x="960" data-target-y="520" style="width: 240px; height: auto; top: 50px;">
-            <img src="Assets/G2_Stromaggregat.jpg" alt="Stromerzeuger 8kVa">
+        
+        <div class="draggable hidden-piece" id="piece-2" data-location="links" data-target-x="920" data-target-y="600" style="width: 100px; height: auto; top: 50px;">
+            <img src="Assets/GR_Rettungssatz.jpg" alt="Rettungssatz (Schere und Spreizer)">
         </div>
 
-        <div class="draggable hidden-piece" id="piece-4" data-location="rechts" data-target-x="670" data-target-y="350" style="width: 170px; height: auto; top: 50px;">
-            <img src="Assets/G4_Flutlichtstrahler.jpg" alt="Flutlichtstrahler + Leitungsroller">
+        <div class="draggable hidden-piece" id="piece-3" data-location="hinten" data-target-x="180" data-target-y="500" style="width: 150px; height: auto; top: 50px;">
+            <img src="Assets/GR_Halligan-Tool.jpg" alt="Halligan-Tool">
         </div>
 
-        <div class="draggable hidden-piece" id="piece-5" data-location="links" data-target-x="645" data-target-y="165" style="width: 210px; height: auto; top: 50px;">
-            <img src="Assets/G3_Hitzeschutzanzuege.jpg" alt="Hitzeschutzkleidung Form 2">
+        <div class="draggable hidden-piece" id="piece-4" data-location="kabine" data-target-x="500" data-target-y="50" style="width: 200px; height: auto; top: 50px;">
+            <img src="Assets/GR_Warnwesten.jpg" alt="Warnwesten">
         </div>
 
-        <div class="draggable hidden-piece" id="piece-6" data-location="links" data-target-x="150" data-target-y="450" style="width: 90px; height: auto; top: 50px;">
-            <img src="Assets/G1_Glasschneidekoffer.jpg" alt="Koffer Glasmanagement">
+        <div class="draggable hidden-piece" id="piece-5" data-location="dach" data-target-x="100" data-target-y="10" style="width: 100px; height: auto; top: 50px;">
+            <img src="Assets/GR_Schlauchhaspel.jpg" alt="Schlauchhaspel">
         </div>
-
-        <div class="draggable hidden-piece" id="piece-7" data-location="links" data-target-x="135" data-target-y="410" style="width: 100px; height: auto; top: 50px;">
-            <img src="Assets/G1_Bereitstellungsplane.jpg" alt="Bereitstellungsplane">
+        
         </div>
-
-        <div class="draggable hidden-piece" id="piece-8" data-location="links" data-target-x="390" data-target-y="570" style="width: 50px; height: auto; top: 50px;">
-            <img src="Assets/G1_Kleine_hydraulische_Schere.jpg" alt="Pedalschneider">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-9" data-location="links" data-target-x="290" data-target-y="350" style="width: 140px; height: auto; top: 50px;">
-            <img src="Assets/G1_Lüfter.jpg" alt="Belüftungsgerät">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-10" data-location="links" data-target-x="135" data-target-y="500" style="width: 130px; height: auto; top: 50px;">
-            <img src="Assets/G1_Ölwanne.jpg" alt="Mulde">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-11" data-location="links" data-target-x="350" data-target-y="500" style="width: 100px; height: auto; top: 50px;" data-closeupsrc="Assets/GR_B-Schlauch5m.jpg">
-            <img src="Assets/G1_Spreizerzubehör.jpg" alt="Spreizerzubehör">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-12" data-location="links" data-target-x="130" data-target-y="320" style="width: 150px; height: auto; top: 50px;">
-            <img src="Assets/G1_Unterbauschiebeblock.jpg" alt="Unterbaumaterial">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-13" data-location="links" data-target-x="940" data-target-y="380" style="width: 270px; height: auto; top: 50px;">
-            <img src="Assets/G5_Schlauchtragekorb.jpg" alt="Schlauchtragekorb">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-14" data-location="links" data-target-x="315" data-target-y="187" style="width: 120px; height: auto; top: 50px;">
-            <img src="Assets/G1_Ersatzflaschen.jpg" alt="Ersatzflaschen für Pressluftatmer">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-15" data-location="links" data-target-x="510" data-target-y="410" style="width: 120px; height: auto; top: 50px;">
-            <img src="Assets/G3_Erste_Hilfe_Rucksack.jpg" alt="Notfallrucksack">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-16" data-location="links" data-target-x="480" data-target-y="269" style="width: 38px; height: auto; top: 50px;">
-            <img src="Assets/G3_Halligan_Tool.jpg" alt="Halligan-Tool">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-17" data-location="links" data-target-x="550" data-target-y="160" style="width: 80px; height: auto; top: 50px;">
-            <img src="Assets/G3_Kübelspritze.jpg" alt="Kübelspritze">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-18" data-location="links" data-target-x="530" data-target-y="330" style="width: 80px; height: auto; top: 50px;">
-            <img src="Assets/G3_RZA_Tafel.jpg" alt="RZA-Tafel">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-19" data-location="links" data-target-x="940" data-target-y="215" style="width: 80px; height: auto; top: 50px;">
-            <img src="Assets/G5_Absperrkegel.jpg" alt="Verkehrsleitkegel">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-20" data-location="links" data-target-x="900" data-target-y="215" style="width: 40px; height: auto; top: 50px;">
-            <img src="Assets/G5_B-Schlauch_5m.jpg" alt="Schlauch B-5">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-21" data-location="links" data-target-x="1097" data-target-y="210" style="width: 80px; height: auto; top: 50px;">
-            <img src="Assets/G5_Hohlstrahlrohr.jpg" alt="Hohlstrahlrohr">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-22" data-location="links" data-target-x="920" data-target-y="315" style="width: 280px; height: auto; top: 50px;">
-            <img src="Assets/G5_Schlauchpaket.jpg" alt="Schlauchpaket">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-23" data-location="links" data-target-x="1010" data-target-y="550" style="width: 200px; height: auto; top: 50px;">
-            <img src="Assets/G5_Schnellangriffsverteiler.jpg" alt="Schnellangriffsverteiler">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-24" data-location="links" data-target-x="1178" data-target-y="200" style="width: 30px; height: auto; top: 50px;">
-            <img src="Assets/G5_Strahlrohr_D_Schlauch.jpg" alt="DM-Strahlrohr">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-25" data-location="links" data-target-x="806" data-target-y="255" style="width: 60px; height: auto; top: 50px;">
-            <img src="Assets/G3_Feuerwehraxt.jpg" alt="Feuerwehraxt">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-26" data-location="links" data-target-x="905" data-target-y="368" style="width: 35px; height: auto; top: 50px;">
-            <img src="Assets/G5_Warndreiecke.jpg" alt="Faltsignale">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-27" data-location="links" data-target-x="915" data-target-y="552" style="width: 90px; height: auto; top: 50px;">
-            <img src="Assets/G5_Verteiler.jpg" alt="Verteiler">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-28" data-location="links" data-target-x="1023" data-target-y="238" style="width: 70px; height: auto; top: 50px;">
-            <img src="Assets/G5_Überdruckventil.jpg" alt="Überdruckbegrenzungsventil">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-29" data-location="rechts" data-target-x="900" data-target-y="625" style="width: 60px; height: auto; top: 50px;">
-            <img src="Assets/G2_Benzinkanister.jpg" alt="Reservekanister">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-30" data-location="rechts" data-target-x="900" data-target-y="190" style="width: 130px; height: auto; top: 50px;">
-            <img src="Assets/G2_B-Schläuche.jpg" alt="Schlauch B-20">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-31" data-location="rechts" data-target-x="1070" data-target-y="200" style="width: 150px; height: auto; top: 50px;">
-            <img src="Assets/G2_CSA_Anzug.jpg" alt="Chemieschutzanzug">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-32" data-location="rechts" data-target-x="1140" data-target-y="460" style="width: 60px; height: auto; top: 50px;">
-            <img src="Assets/G2_Lichtmast.jpg" alt="Stativ">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-33" data-location="rechts" data-target-x="1060" data-target-y="445" style="width: 70px; height: auto; top: 50px;">
-            <img src="Assets/G2_Motorsäge.jpg" alt="Kettensäge">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-34" data-location="rechts" data-target-x="1140" data-target-y="410" style="width: 60px; height: auto; top: 50px;">
-            <img src="Assets/G2_Rettungstrage_zusammenklappbar.jpg" alt="Rettungstrage">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-35" data-location="rechts" data-target-x="1060" data-target-y="328" style="width: 150px; height: auto; top: 50px;">
-            <img src="Assets/G2_Saugschläuche.jpg" alt="Saugschläuche">
-        </div>
-        <div class="draggable hidden-piece" id="piece-36" data-location="kabine" data-target-x="30" data-target-y="200" style="width: 150px; height: auto; top: 50px;">
-            <img src="Assets/Kabine_Decke.jpg" alt="Decke">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-37" data-location="kabine" data-target-x="60" data-target-y="440" style="width: 70px; height: auto; top: 50px;">
-            <img src="Assets/Kabine_Werkzeugkoffer.jpg" alt="Werkzeugkasten">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-38" data-location="kabine" data-target-x="290" data-target-y="250" style="width: 120px; height: auto; top: 50px;">
-            <img src="Assets/Kabine_Sicherheitstrupptasche.jpg" alt="Atemschutznotfalltasche">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-39" data-location="kabine" data-target-x="290" data-target-y="190" style="width: 100px; height: auto; top: 50px;">
-            <img src="Assets/Kabine_Bolzenschneider.jpg" alt="Drahtschere">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-40" data-location="rechts" data-target-x="390" data-target-y="260" style="width: 40px; height: auto; top: 50px;">
-            <img src="Assets/G6_Hydrantenschlüssel.jpg" alt="Überflurhydrantenschlüssel">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-41" data-location="rechts" data-target-x="340" data-target-y="205" style="width: 50px; height: auto; top: 50px;">
-            <img src="Assets/G6_Schaummischer_B_Schlauch.jpg" alt="Zumischer B + Stützkrümmer">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-42" data-location="rechts" data-target-x="140" data-target-y="455" style="width: 50px; height: auto; top: 50px;">
-            <img src="Assets/G6_Schaummischer_C_Schlauch.jpg" alt="Zumischer C">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-43" data-location="rechts" data-target-x="190" data-target-y="397" style="width: 240px; height: auto; top: 50px;">
-            <img src="Assets/G6_Schaummittel.jpg" alt="Schaummittelkanister">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-44" data-location="rechts" data-target-x="130" data-target-y="165" style="width: 210px; height: auto; top: 50px;">
-            <img src="Assets/G6_Schnellangriff.jpg" alt="Formstabiler Schnellangriffsschlauch">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-45" data-location="rechts" data-target-x="140" data-target-y="525" style="width: 285px; height: auto; top: 50px;">
-            <img src="Assets/G6_Schwerschaumkanone.jpg" alt="Schwerschaumrohr">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-46" data-location="rechts" data-target-x="140" data-target-y="325" style="width: 170px; height: auto; top: 50px;">
-            <img src="Assets/G6_Strahlrohre.jpg" alt="CM / BM / DM Strahlrohr">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-47" data-location="rechts" data-target-x="315" data-target-y="325" style="width: 130px; height: auto; top: 50px;">
-            <img src="Assets/G6_Unterflurhydrant_mit_Schlüssel.jpg" alt="Unterflurhydrantenschlüssel + Standrohr">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-48" data-location="rechts" data-target-x="475" data-target-y="415" style="width: 100px; height: auto; top: 50px;">
-            <img src="Assets/G4_Flex.jpg" alt="Motortrennschleifer">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-49" data-location="rechts" data-target-x="575" data-target-y="415" style="width: 90px; height: auto; top: 50px;">
-            <img src="Assets/G4_Tauchpumpe.jpg" alt="Tauchpumpe">
-		</div>
-
-        <div class="draggable hidden-piece" id="piece-50" data-location="rechts" data-target-x="475" data-target-y="220" style="width: 130px; height: auto; top: 50px;">
-            <img src="Assets/G4_Turbotauchpumpe.jpg" alt="Turbotauchpumpe">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-51" data-location="rechts" data-target-x="475" data-target-y="320" style="width: 180px; height: auto; top: 50px;">
-            <img src="Assets/G4_Unterlegklötze.jpg" alt="Unterbaumaterial">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-52" data-location="rechts" data-target-x="720" data-target-y="215" style="width: 130px; height: auto; top: 50px;">
-            <img src="Assets/G4_Wadhose.jpg" alt="Wadhose">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-53" data-location="rechts" data-target-x="590" data-target-y="240" style="width: 130px; height: auto; top: 50px;">
-            <img src="Assets/G4_Absturzsicherung.jpg" alt="Gerätesatz Absturzsicherung">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-54" data-location="links" data-target-x="40" data-target-y="630" style="width: 70px; height: auto; top: 50px;">
-            <img src="Assets/G0_Unterlegkeil.jpg" alt="2*Unterlegkeile">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-55" data-location="hinten" data-target-x="80" data-target-y="220" style="width: 150px; height: auto; top: 50px;">
-            <img src="Assets/GR_Saugkorb.jpg" alt="Saugkorb">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-56" data-location="hinten" data-target-x="230" data-target-y="230" style="width: 130px; height: auto; top: 50px;">
-            <img src="Assets/GR_Sammelstück.jpg" alt="Sammelstück">
-        </div>
-
-        <div class="draggable hidden-piece" id="piece-57" data-location="hinten" data-target-x="380" data-target-y="260" style="width: 70px; height: auto; top: 50px;">
-            <img src="Assets/GR_B-Schlauch5m.jpg" alt="Schlauch B-5">
-        </div>
- 
-		<div id="feedback" class="hidden"></div>
-    	</div>
-
-    <script src="script.js"></script>
-</body>
+    
+    <script src="script.js?v=1"></script> 
+    </body>
 </html>

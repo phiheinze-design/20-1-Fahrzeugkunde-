@@ -4,13 +4,20 @@
 // Programmierer: Philipp Heinze, Feuerwehr Stadtlauringen, phi.heinze@gmail.com
 
 
+// HILFSFUNKTION: Fisher-Yates (Knut) Shuffle Algorithmus
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
+
 // Auslesen der Daten aus dem HTML
 function loadPieceOrderFromDOM() {
     const pieces = [];
+    // Der Selektor ist gut, aber der Aufruf muss verzögert werden!
     document.querySelectorAll('.draggable').forEach(d => {
-        // Daten aus data-Attributen und dem alt-Text auslesen
         const location = d.dataset.location;
-        // Sicherstellen, dass der Alt-Text der Bildquelle als Name dient
         const name = d.querySelector('img').alt; 
         
         pieces.push({
@@ -22,16 +29,6 @@ function loadPieceOrderFromDOM() {
    return pieces;
 }
 
-// HILFSFUNKTION: Fisher-Yates (Knut) Shuffle Algorithmus
-function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-}
-
-const pieceOrder = loadPieceOrderFromDOM();
-shuffleArray(pieceOrder)
 
 // HINWEIS: Bitte diese Größen anpassen, falls nötig
 const locationSizes = {
@@ -42,51 +39,98 @@ const locationSizes = {
 	'dach': { width: '1200px', height: '448px' },
 };
 
+// Deklariere globale Variablen, initialisiere sie aber in DOMContentLoaded
+let pieceOrder = [];
 let currentPieceIndex = 0;
-let currentPieceData = pieceOrder[currentPieceIndex];
+let currentPieceData = null;
 let currentViewLocation = null; 
 
-// Referenzen zu den HTML-Elementen
-const selectionArea = document.getElementById('selection-area');
-const itemPrompt = document.getElementById('item-prompt');
-const choiceButtons = document.querySelectorAll('#location-controls .choice-button'); 
-const targetImage = document.getElementById('target-image');
-const feedbackElement = document.getElementById('feedback');
-const puzzleArea = document.getElementById('puzzle-area');
-const itemImage = document.getElementById('item-image'); 
-const solveButton = document.getElementById('solve-button');
-const itemCloseupImage = document.getElementById('item-closeup-image'); // <--- DIESE ZEILE HINZUFÜGEN
+// Referenzen zu den HTML-Elementen (werden in DOMContentLoaded initialisiert)
+let selectionArea;
+let itemPrompt;
+let choiceButtons; 
+let targetImage;
+let feedbackElement;
+let puzzleArea;
+let itemImage; 
+let solveButton;
+let itemCloseupImage;
 
 // Drag-and-Drop Variablen
-const draggables = document.querySelectorAll('.draggable');
-const allDraggables = draggables;
+let allDraggables;
 let currentDraggedElement = null;
 let offset = { x: 0, y: 0 };
 
 
 // -------------------------------------------------------------
-// B. HILFSFUNKTIONEN ZUM SPEICHERN DER STARTSTYLES
+// B. HILFSFUNKTIONEN ZUM SPEICHERN DER STARTSTYLES & INITIALISIERUNG
 // -------------------------------------------------------------
 function initializeDraggables() {
+    // Sicherstellen, dass die DOM-Elemente existieren, bevor darauf zugegriffen wird
+    if (!allDraggables || allDraggables.length === 0) return;
+
     allDraggables.forEach(d => {
-        // Wir speichern nur TOP und Breite/Höhe, da LEFT dynamisch berechnet wird
-        d.dataset.initialLeft = d.style.left; // Nur als Fallback/Referenz
+        d.dataset.initialLeft = d.style.left;
         d.dataset.initialTop = d.style.top;
         d.dataset.initialWidth = d.style.width;
         d.dataset.initialHeight = d.style.height;
-        
-        d.draggable = true; 
+        d.draggable = true;
     });
-	//showAllSolutions('links');
-	//showAllSolutions('rechts');
-	//showAllSolutions('kabine');
-	//showAllSolutions('hinten');
+
+    // EVENT LISTENERS FÜR BUTTONS UND DRAG/DROP HINZUFÜGEN
+    choiceButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            setLocationView(button.dataset.position);
+        });
+    });
+
+    if (solveButton) {
+        solveButton.addEventListener('click', showSolution);
+    }
+    
+    // DRAG & DROP LOGIK HINZUFÜGEN (Muss neu gesetzt werden, da es in der alten Datei fehlte)
+    allDraggables.forEach(draggable => {
+        draggable.addEventListener('dragstart', (e) => {
+            if (draggable.draggable === false) { 
+                 e.preventDefault(); 
+                 return;
+            }
+            currentDraggedElement = draggable;
+            const rect = draggable.getBoundingClientRect();
+            offset.x = e.clientX - rect.left;
+            offset.y = e.clientY - rect.top;
+            e.dataTransfer.setDragImage(draggable, offset.x, offset.y); 
+            e.dataTransfer.setData('text/plain', draggable.id);
+            draggable.classList.add('is-dragging'); 
+        });
+    });
+
+    puzzleArea.addEventListener('dragover', (e) => { e.preventDefault(); });
+    puzzleArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (!currentDraggedElement) return;
+
+        const areaRect = puzzleArea.getBoundingClientRect();
+        let dropX = e.clientX - areaRect.left - offset.x;
+        let dropY = e.clientY - areaRect.top - offset.y;
+
+        currentDraggedElement.style.left = `${dropX}px`;
+        currentDraggedElement.style.top = `${dropY}px`;
+        currentDraggedElement.classList.remove('is-dragging');
+        
+        checkPosition(currentDraggedElement, dropX, dropY);
+        currentDraggedElement = null;
+    });
+
     startNextItemSelection();
 }
 
 
 // -------------------------------------------------------------
 // C. STATUS-STEUERUNG (Selection Step)
+// -------------------------------------------------------------
+// Die nachfolgenden Funktionen (startNextItemSelection, showFinishedMessage) 
+// können unverändert bleiben, da sie nun korrekt initialisiert werden.
 // -------------------------------------------------------------
 
 function startNextItemSelection() {
@@ -106,7 +150,7 @@ function startNextItemSelection() {
     
     allDraggables.forEach(d => d.classList.add('hidden-piece'));
 
-const currentDraggableElement = document.getElementById(currentPieceData.id);
+    const currentDraggableElement = document.getElementById(currentPieceData.id);
     if (currentDraggableElement) {
         const imageSource = currentDraggableElement.querySelector('img').src;
         itemImage.src = imageSource;
@@ -115,25 +159,23 @@ const currentDraggableElement = document.getElementById(currentPieceData.id);
         itemImage.style.width = currentDraggableElement.dataset.initialWidth || currentDraggableElement.style.width;
         itemImage.style.height = currentDraggableElement.dataset.initialHeight || currentDraggableElement.style.height;
        
-        const closeupSource = currentDraggableElement.dataset.closeupsrc; // Liest das neue Attribut aus
+        const closeupSource = currentDraggableElement.dataset.closeupsrc;
 		
         if (itemCloseupImage) {
             if (closeupSource) {
                  itemCloseupImage.src = closeupSource;
                  itemCloseupImage.alt = `Nahaufnahme von ${currentPieceData.name}`;
-                 itemCloseupImage.classList.remove('hidden'); // Macht das Bild sichtbar (entfernt die 'hidden' Klasse)
+                 itemCloseupImage.classList.remove('hidden'); 
             } else {
                  itemCloseupImage.src = '';
-                 itemCloseupImage.classList.add('hidden'); // Versteckt das Bild, falls kein Pfad vorhanden
+                 itemCloseupImage.classList.add('hidden');
             }
         }
-        // Ende NEU
     }
 }
 
 function showFinishedMessage() {
     
-    // 1. Meldung und Button dynamisch in die selectionArea einfügen.
     selectionArea.innerHTML = '<h2>🏆 Glückwunsch! Du hast alle Teile gelöst.</h2>' +
                               '<p>Klicke auf **OK**, um die vollständige Lösung anzusehen.</p>' +
                               '<button id="finish-button" class="choice-button">OK</button>';
@@ -141,7 +183,6 @@ function showFinishedMessage() {
 	selectionArea.classList.remove('hidden');
     if (solveButton) solveButton.classList.add('hidden');
     
-    // 3. Den Button holen und den Event Listener hinzufügen
     const finishButton = document.getElementById('finish-button');
     
     if (finishButton) {
@@ -156,27 +197,18 @@ function showFinishedMessage() {
 // D. GROBE POSITION WECHSELN/KORRIGIEREN (Zentralisierte Logik)
 // -------------------------------------------------------------
 
-
-
 function setLocationView(location) {
     currentViewLocation = location;
     
     let newInitialLeft = null;
 
-    // Größe des Containers anpassen
     const size = locationSizes[location];
     if (size) {
         puzzleArea.style.width = size.width; 
         puzzleArea.style.height = size.height;
-        
-        // 🚀 NEU: Dynamische Left-Berechnung
-        // 1. Breite des Containers ermitteln (z.B. 500)
-        const areaWidthPx = parseInt(size.width); 
-        // 2. Neue Startposition berechnen (Breite + 50px Abstand)
-        newInitialLeft = `${areaWidthPx + 50}px`; 
+        newInitialLeft = `${parseInt(size.width) + 50}px`; 
     }
 
-    // 1. Lade das korrekte Hintergrundbild
     let bgFile = '';
     switch (location) {
         case 'links':
@@ -199,78 +231,59 @@ function setLocationView(location) {
     }
     targetImage.src = `Assets/${bgFile}`;
     
-    // 2. Verwalte die Sichtbarkeit und Ziehbarkeit der Teile
     allDraggables.forEach(d => {
         const isCurrentPiece = d.id === currentPieceData.id;
         const isSolved = d.classList.contains('solved');
 
         if (isSolved) {
             d.draggable = false; 
-            
             if (d.dataset.location === location) {
                 d.classList.remove('hidden-piece'); 
             } else {
                 d.classList.add('hidden-piece');
             }
-            
         } else if (isCurrentPiece) {
-            // Das AKTUELLE, UNGELÖSTE Teil:
             d.classList.remove('hidden-piece');
             d.draggable = true; 
-
-            // Setze Position zurück (Dynamisch für Left, statisch für Top)
             if (newInitialLeft) {
-                // 🚀 HIER: Dynamische Left-Position anwenden
                 d.style.setProperty('left', newInitialLeft, 'important');
             } else {
-                // Fallback auf den ursprünglichen HTML-Wert
                 d.style.setProperty('left', d.dataset.initialLeft, 'important');
             }
-            
             d.style.setProperty('top', d.dataset.initialTop, 'important'); 
             d.style.setProperty('z-index', '10', 'important'); 
-
         } else {
-            // Verstecke alle anderen (ungelösten, nicht aktuellen) Teile
             d.classList.add('hidden-piece'); 
         }
     });
 
-    // 3. Wechsel zur Puzzle-Ansicht
     selectionArea.classList.add('hidden');
     puzzleArea.classList.remove('hidden');
 }
 
 
 // -------------------------------------------------------------
-// E. LÖSUNGSLOGIK
+// E. LÖSUNGSLOGIK & checkPosition
 // -------------------------------------------------------------
 
 function showSolution() {
     const piece = document.getElementById(currentPieceData.id);
     if (!piece) return;
-
-    // 1. Wechsel zur korrekten Ansicht, falls nicht schon geschehen
     setLocationView(currentPieceData.location);
-
-    // 2. Element an die korrekte Zielposition setzen
     const targetX = parseInt(piece.dataset.targetX); 
     const targetY = parseInt(piece.dataset.targetY);
 
     piece.style.left = `${targetX}px`;
     piece.style.top = `${targetY}px`;
     piece.draggable = false;
-    
     piece.classList.add('solved');
     piece.classList.remove('hidden-piece'); 
     piece.classList.add('highlight-solution');
 
-    // 3. Feedback anzeigen
     feedbackElement.textContent = '✅ Lösung angezeigt.';
     feedbackElement.className = 'correct';
     feedbackElement.classList.remove('hidden');
     
-    // 4. Gehe zur nächsten Aufgabe
     currentPieceIndex++;
     
     setTimeout(() => {
@@ -281,84 +294,13 @@ function showSolution() {
     }, 1500);
 }
 
-
-// -------------------------------------------------------------
-// F. EVENT LISTENERS
-// -------------------------------------------------------------
-
-// Klicks auf die Standort-Buttons
-choiceButtons.forEach(button => {
-    button.addEventListener('click', () => {
-        setLocationView(button.dataset.position);
-    });
-});
-
-// NEU: Klick auf den Lösungs-Button
-if (solveButton) {
-    solveButton.addEventListener('click', showSolution);
-}
-
-
-// -------------------------------------------------------------
-// G. DRAG & DROP LOGIK
-// -------------------------------------------------------------
-
-draggables.forEach(draggable => {
-    draggable.addEventListener('dragstart', (e) => {
-        
-        // Verhindere das Ziehen basierend auf der 'draggable'-Eigenschaft
-        if (draggable.draggable === false) { 
-             e.preventDefault(); 
-             return;
-        }
-
-        currentDraggedElement = draggable;
-        const rect = draggable.getBoundingClientRect();
-        offset.x = e.clientX - rect.left;
-        offset.y = e.clientY - rect.top;
-	e.dataTransfer.setDragImage(draggable, offset.x, offset.y); 
-
-        // Nur für die Drag-API: Daten setzen (kann leer sein, aber muss sein)
-        e.dataTransfer.setData('text/plain', draggable.id);
-        draggable.classList.add('is-dragging'); 
-    });
-});
-
-puzzleArea.addEventListener('dragover', (e) => {
-    e.preventDefault(); 
-});
-
-puzzleArea.addEventListener('drop', (e) => {
-    e.preventDefault();
-    if (!currentDraggedElement) return;
-
-    const areaRect = puzzleArea.getBoundingClientRect();
-    let dropX = e.clientX - areaRect.left - offset.x;
-    let dropY = e.clientY - areaRect.top - offset.y;
-
-    currentDraggedElement.style.left = `${dropX}px`;
-    currentDraggedElement.style.top = `${dropY}px`;
-    currentDraggedElement.classList.remove('is-dragging');
-    
-    checkPosition(currentDraggedElement, dropX, dropY);
-    
-    currentDraggedElement = null; 
-});
-
-
-// -------------------------------------------------------------
-// H. FEINPOSITION PRÜFEN (checkPosition)
-// -------------------------------------------------------------
-
 function checkPosition(element, currentX, currentY) {
 
     if (currentViewLocation !== currentPieceData.location) {
-        // Falscher Hintergrund gewählt! 
         feedbackElement.textContent = `❌ Falsch. Das Teil gehört nicht in den Bereich **${currentViewLocation.toUpperCase()}**.`;
         feedbackElement.className = 'incorrect';
         feedbackElement.classList.remove('hidden');
         
-        // Element zur Startposition zurücksetzen
         element.style.setProperty('left', element.dataset.initialLeft, 'important');
         element.style.setProperty('top', element.dataset.initialTop, 'important');
         
@@ -369,23 +311,14 @@ function checkPosition(element, currentX, currentY) {
         return; 
     }
     
-    // --- Wenn die Location KORREKT ist, prüfe die Feinposition ---
     const targetX = parseInt(element.dataset.targetX); 
     const targetY = parseInt(element.dataset.targetY);
     const tolerance = 100; 
-
-
-    console.log(`--- KOORDINATEN FÜR ${element.id} ---`);
-    console.log(`data-target-x="${Math.round(currentX)}"`);
-    console.log(`data-target-y="${Math.round(currentY)}"`);
-    console.log('------------------------------------------------');
-    // ----------------------------------------------------
 
     const isCorrectX = Math.abs(currentX - targetX) < tolerance;
     const isCorrectY = Math.abs(currentY - targetY) < tolerance;
 
     if (isCorrectX && isCorrectY) {
-        // POSITIVES Feedback & Einrasten (Location und Position sind richtig)
         feedbackElement.textContent = '🎉 Richtig! Gut gemacht.';
         feedbackElement.className = 'correct';
         feedbackElement.classList.remove('hidden');
@@ -393,9 +326,7 @@ function checkPosition(element, currentX, currentY) {
         element.style.left = `${targetX}px`;
         element.style.top = `${targetY}px`;
         element.draggable = false; 
-        
         element.classList.add('solved');
-        
         currentPieceIndex++;
         
         setTimeout(() => {
@@ -405,12 +336,10 @@ function checkPosition(element, currentX, currentY) {
         }, 1500); 
 
     } else {
-        // NEGATIVES Feedback (Location ist richtig, aber Position ist falsch)
         feedbackElement.textContent = '❌ Falsche Position. Versuch es nochmal genauer.';
         feedbackElement.className = 'incorrect';
         feedbackElement.classList.remove('hidden');
         
-        // Element zur Startposition zurücksetzen (Verwendet nun initialTop/Left)
         element.style.setProperty('left', element.dataset.initialLeft, 'important');
         element.style.setProperty('top', element.dataset.initialTop, 'important');
         
@@ -423,59 +352,36 @@ function checkPosition(element, currentX, currentY) {
 
 
 // -------------------------------------------------------------
-// E. DEBUG-FUNKTION (DIE GEWÜNSCHTE GESAMTLÖSUNG)
+// F. SICHERE INITIALISIERUNG (DER KRITISCHE TEIL)
 // -------------------------------------------------------------
 
-/**
- * Zeigt alle Puzzleteile für eine bestimmte Location an ihren Zielkoordinaten an.
- * Dies ist ein reines Debugging-Tool für die Programmerstellung.
- * @param {string} locationToShow - Die Location, deren Lösung angezeigt werden soll (z.B. 'links', 'kabine').
- */
-function showAllSolutions(locationToShow) {
-    if (!locationToShow) {
-        console.error("⛔ Bitte geben Sie die Location an, z.B. showAllSolutions('links')");
-        return;
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Element-Referenzen setzen (jetzt, wo sie garantiert existieren)
+    selectionArea = document.getElementById('selection-area');
+    itemPrompt = document.getElementById('item-prompt');
+    choiceButtons = document.querySelectorAll('#location-controls .choice-button'); 
+    targetImage = document.getElementById('target-image');
+    feedbackElement = document.getElementById('feedback');
+    puzzleArea = document.getElementById('puzzle-area');
+    itemImage = document.getElementById('item-image'); 
+    solveButton = document.getElementById('solve-button');
+    itemCloseupImage = document.getElementById('item-closeup-image'); 
+    allDraggables = document.querySelectorAll('.draggable');
+
+    // 2. Daten laden (jetzt funktioniert es!)
+    pieceOrder = loadPieceOrderFromDOM();
+    
+    if (pieceOrder.length > 0) {
+        // 3. ZUFALLSGENERATOR AKTIVIEREN
+        shuffleArray(pieceOrder);
+        
+        // 4. Erstes Teil der Liste setzen
+        currentPieceData = pieceOrder[currentPieceIndex];
+        
+        // 5. Initialisierung starten
+        initializeDraggables();
+    } else {
+        console.error("Fehler: Konnte keine Puzzleteile im HTML finden.");
+        alert("Fehler beim Laden des Spiels (Keine Puzzleteile gefunden).");
     }
-
-    // 1. Setze die Ansicht auf die gewünschte Location (Hintergrund und Containergröße)
-    setLocationView(locationToShow);
-    selectionArea.classList.add('hidden');
-    puzzleArea.classList.remove('hidden');
-
-    // 2. Iteriere über alle Puzzleteile und platziere sie
-    document.querySelectorAll('.draggable').forEach(element => {
-        // Prüfe, ob das Teil zur aktuellen Location gehört
-        if (element.dataset.location === locationToShow) {
-            const targetX = parseInt(element.dataset.targetX);
-            const targetY = parseInt(element.dataset.targetY);
-
-            // Mache das Teil sichtbar
-            element.classList.remove('hidden-piece');
-            
-            // Setze die korrekte Position
-            element.style.left = `${targetX}px`;
-            element.style.top = `${targetY}px`;
-            
-            // Stelle sicher, dass die korrekte Größe verwendet wird (aus den initial gespeicherten Werten)
-            element.style.width = element.dataset.initialWidth;
-            element.style.height = element.dataset.initialHeight;
-            
-            // Markiere als gelöst und deaktiviere Dragging
-            element.classList.add('solved');
-            element.draggable = false;
-        } else {
-            // Teile, die nicht zur aktuellen Location gehören, verstecken
-            element.classList.add('hidden-piece');
-        }
-    });
-
-    console.log(`✅ Alle Teile für Location '${locationToShow}' wurden an ihren Zielpositionen platziert.`);
-}
-
-
-// -------------------------------------------------------------
-// F. START
-// -------------------------------------------------------------
-initializeDraggables();
-
-initializeDraggables();
+});

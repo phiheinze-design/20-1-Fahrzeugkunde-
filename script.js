@@ -31,7 +31,7 @@ function shuffleArray(array) {
 }
 
 const pieceOrder = loadPieceOrderFromDOM();
-//shuffleArray(pieceOrder)
+shuffleArray(pieceOrder)
 
 // HINWEIS: Bitte diese Größen anpassen, falls nötig
 const locationSizes = {

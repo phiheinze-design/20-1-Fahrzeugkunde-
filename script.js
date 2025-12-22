@@ -248,40 +248,6 @@ function setLocationView(location) {
     selectionArea.classList.add('hidden');
     puzzleArea.classList.remove('hidden');
 
-
-    // =======================================================================
-    // NEU: ZWEI-SCHRITT-SCROLL-LOGIK FÜR MOBILE (Auto-Zoom-Überblick)
-    // =======================================================================
-    // Wir prüfen, ob der Bildschirm schmal ist (typisch für Handys)
-    if (window.innerWidth < 1000) { 
-        
-        // --- SCHRITT 1: ÜBERSICHT (Auto-Scroll, um das Auto zu zeigen) ---
-        const puzzleAreaRect = puzzleArea.getBoundingClientRect();
-        
-        window.scrollTo({
-            // Scrollen zum linken Rand des Autos
-            left: window.scrollX + puzzleAreaRect.left, 
-            // Scrollen zum oberen Rand des Autos
-            top: window.scrollY + puzzleAreaRect.top, 
-            behavior: 'smooth'
-        });
-
-        // --- SCHRITT 2: FOKUS (Nach 800ms zum Puzzleteil scrollen) ---
-        setTimeout(() => {
-            const currentPieceElement = document.getElementById(currentPieceData.id);
-            if (currentPieceElement) {
-                // Scrollen zum Puzzleteil (es liegt rechts)
-                currentPieceElement.scrollIntoView({ 
-                    behavior: 'smooth', 
-                    block: 'center', 
-                    inline: 'center' 
-                });
-            }
-        }, 800); // 800ms Zeit, um das Auto anzusehen
-    }
-    // =======================================================================
-
-
     // ** KORRIGIERTE LOGIK MIT TIMEOUT: Messung der Höhe und Positionierung **
     // Wir verzögern die Messung (50ms), damit der Browser Zeit hat, das Bild zu rendern und die Höhe zu ermitteln.
     setTimeout(() => {
@@ -453,7 +419,7 @@ draggables.forEach(draggable => {
     });
 
     // --------------------------------------------------
-    // 2. TOUCH-EVENTS (Mobile-Support)
+    // 2. TOUCH-EVENTS (Mobile-Support NEU)
     // --------------------------------------------------
     
     draggable.addEventListener('touchstart', (e) => {
@@ -639,4 +605,38 @@ function showAllSolutions(locationToShow) {
 
     // NEU: Statischen Hint für die Lösungsansicht ausblenden
     if (staticDragHint) {
-        static
+        staticDragHint.classList.add('hidden'); 
+    }
+
+    // 2. Iteriere über alle Puzzleteile und platziere sie
+    document.querySelectorAll('.draggable').forEach(element => {
+        // Prüfe, ob das Teil zur aktuellen Location gehört
+        if (element.dataset.location === locationToShow) {
+            const targetX = parseInt(element.dataset.targetX);
+            const targetY = parseInt(element.dataset.targetY);
+
+            // Mache das Teil sichtbar
+            element.classList.remove('hidden-piece');
+            
+            // Setze die korrekte Position
+            element.style.left = `${targetX}px`;
+            element.style.top = `${targetY}px`;
+            
+            // Markiere als gelöst und deaktiviere Dragging
+            element.classList.add('solved');
+            element.draggable = false;
+
+        } else {
+            // Teile, die nicht zur aktuellen Location gehören, verstecken
+            element.classList.add('hidden-piece');
+        }
+    });
+
+    console.log(`✅ Alle Teile für Location '${locationToShow}' wurden an ihren Zielpositionen platziert.`);
+}
+
+
+// -------------------------------------------------------------
+// J. START
+// -------------------------------------------------------------
+initializeDraggables();

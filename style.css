@@ -88,3 +88,19 @@
     border-radius: 5px;
     object-fit: contain; 
 }
+/* Styling für das statische Hinweistext-Element */
+#static-drag-hint {
+    position: absolute; 
+    
+    /* Optionales Styling */
+    font-size: 24px;
+    font-weight: bold;
+    color: #000; /* Schwarz, gut sichtbar */
+    /* background-color: #ffc; /* Heller Hintergrund zur Hervorhebung */
+    /*padding: 5px 10px;
+    border: 1px solid #cc0;
+    z-index: 9; /* Sollte über allen Draggables liegen, aber unter dem Feedback */
+    text-align: left;
+    width: 150px; /* Feste Breite */
+    transform: translateX(-50%); /* Zentriert den Text um den linken Punkt herum */
+}

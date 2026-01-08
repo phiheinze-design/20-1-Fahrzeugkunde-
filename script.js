@@ -41,6 +41,8 @@ const locationSizes = {
     'kabine': { width: '800px', height: '500px' },
 	'dach': { width: '1200px', height: '448px' },
 };
+// NEU: Größte Basisbreite für die Skalierungsberechnung
+const BASE_PUZZLE_WIDTH = 1280; 
 
 let currentPieceIndex = 0;
 let currentPieceData = pieceOrder[currentPieceIndex];
@@ -88,6 +90,14 @@ function initializeDraggables() {
 // -------------------------------------------------------------
 
 function startNextItemSelection() {
+// -------------------------------------------------------------
+// auskommentieren zum programmieren
+// 	showAllSolutions('links')
+// 	showAllSolutions('rechts')
+// 	showAllSolutions('kabine')
+// 	showAllSolutions('dach')
+// 	showAllSolutions('hinten')
+// -------------------------------------------------------------
     if (currentPieceIndex >= pieceOrder.length) {
 	showFinishedMessage(); 
         return;
@@ -100,6 +110,9 @@ function startNextItemSelection() {
     puzzleArea.classList.add('hidden');
     selectionArea.classList.remove('hidden');
     currentViewLocation = null;
+
+    // NEU: Skalierung entfernen, wenn wir zur Auswahl zurückkehren
+    removeMobileScale(); 
 
     // NEU: Verstecke den statischen Hint
     if (staticDragHint) staticDragHint.classList.add('hidden');
@@ -148,6 +161,9 @@ function showFinishedMessage() {
     // NEU: Statischen Hint verstecken
     if (staticDragHint) staticDragHint.classList.add('hidden');
     
+    // NEU: Skalierung entfernen
+    removeMobileScale(); 
+    
     // 3. Den Button holen und den Event Listener hinzufügen
     const finishButton = document.getElementById('finish-button');
     
@@ -165,6 +181,37 @@ function showFinishedMessage() {
 // -------------------------------------------------------------
 // D. GROBE POSITION WECHSELN/KORRIGIEREN (Zentralisierte Logik)
 // -------------------------------------------------------------
+
+/**
+ * NEUE Hilfsfunktion: Berechnet die Skalierung für Mobilgeräte
+ */
+function applyMobileScale() {
+    // Nur auf schmalen Bildschirmen skalieren (z.B. < 1000px)
+    if (window.innerWidth >= 1000) {
+        removeMobileScale();
+        return;
+    }
+
+    // Wir wollen die maximale Breite (BASE_PUZZLE_WIDTH) in die Viewport-Breite skalieren
+    const scaleFactor = window.innerWidth / BASE_PUZZLE_WIDTH;
+    const finalScale = Math.min(scaleFactor, 1); // Sicherstellen, dass wir nicht "hoch" skalieren
+
+    // Skalierung auf das Element anwenden
+    puzzleArea.style.transform = `scale(${finalScale})`;
+    puzzleArea.style.transformOrigin = '0 0'; // Skaliert von der oberen linken Ecke
+    
+    // Optional: Den Scroll-Balken der Seite entfernen, wenn die Skalierung erfolgt ist
+    document.body.style.overflowX = 'hidden';
+}
+
+/**
+ * NEUE Hilfsfunktion: Entfernt die Skalierung
+ */
+function removeMobileScale() {
+    puzzleArea.style.transform = '';
+    puzzleArea.style.transformOrigin = '';
+    document.body.style.overflowX = 'auto';
+}
 
 
 function setLocationView(location) {
@@ -248,6 +295,14 @@ function setLocationView(location) {
     selectionArea.classList.add('hidden');
     puzzleArea.classList.remove('hidden');
 
+
+    // =======================================================================
+    // NEU: SCALING FÜR MOBILE (Auto-Zoom-Out)
+    // =======================================================================
+    applyMobileScale();
+    // =======================================================================
+
+
     // ** KORRIGIERTE LOGIK MIT TIMEOUT: Messung der Höhe und Positionierung **
     // Wir verzögern die Messung (50ms), damit der Browser Zeit hat, das Bild zu rendern und die Höhe zu ermitteln.
     setTimeout(() => {
@@ -282,6 +337,13 @@ function setLocationView(location) {
 
                 // Debugging-Ausgabe (Kontrolle)
                 console.log(`[DEBUG HINT POS - TIMEOUT] Measured Height (offsetHeight): ${initialHeight}px`);
+                
+                // Da wir jetzt skalieren, scrollen wir direkt zum Teil, um es in den Fokus zu bekommen
+                referenceDraggable.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'center', 
+                    inline: 'center' 
+                });
             } else if (staticDragHint) {
                  // Hint verstecken, wenn gelöst oder nicht gefunden
                  staticDragHint.classList.add('hidden');
@@ -393,6 +455,10 @@ draggables.forEach(draggable => {
         }
 
         currentDraggedElement = draggable;
+        
+        // NEU: Skalierung entfernen, um 1:1 Koordinaten zu gewährleisten
+        removeMobileScale(); 
+        
         const rect = draggable.getBoundingClientRect();
         const coords = getEventCoords(e); // Nutzt die Hilfsfunktion
         
@@ -419,7 +485,7 @@ draggables.forEach(draggable => {
     });
 
     // --------------------------------------------------
-    // 2. TOUCH-EVENTS (Mobile-Support NEU)
+    // 2. TOUCH-EVENTS (Mobile-Support)
     // --------------------------------------------------
     
     draggable.addEventListener('touchstart', (e) => {
@@ -429,6 +495,10 @@ draggables.forEach(draggable => {
 
         e.preventDefault(); // Verhindert Scrollen/Zoom auf mobilen Geräten
         currentDraggedElement = draggable;
+        
+        // NEU: Skalierung entfernen, um 1:1 Koordinaten zu gewährleisten
+        removeMobileScale(); 
+        
         const rect = draggable.getBoundingClientRect();
         const coords = getEventCoords(e);
 
@@ -505,6 +575,7 @@ puzzleArea.addEventListener('drop', (e) => {
 // -------------------------------------------------------------
 
 function checkPosition(element, currentX, currentY) {
+    let piecePlacedCorrectly = false;
 
     if (currentViewLocation !== currentPieceData.location) {
         // Falscher Hintergrund gewählt! 
@@ -519,7 +590,7 @@ function checkPosition(element, currentX, currentY) {
         setTimeout(() => {
             feedbackElement.classList.add('hidden');
             feedbackElement.classList.remove('incorrect');
-            // Statischer Hint bleibt sichtbar
+            applyMobileScale(); // Skalierung wieder anwenden, wenn es falsch ist
         }, 3000); 
         return; 
     }
@@ -527,7 +598,12 @@ function checkPosition(element, currentX, currentY) {
     // --- Wenn die Location KORREKT ist, prüfe die Feinposition ---
     const targetX = parseInt(element.dataset.targetX); 
     const targetY = parseInt(element.dataset.targetY);
-    const tolerance = 100; 
+    let tolerance = 100; 
+
+    // 2. Erhöhe die Toleranz für 'dach'-Teile, um eine beliebige Platzierung im korrekten Bereich zu akzeptieren
+    if (currentPieceData.location === 'dach') {
+        tolerance = 5000; // Sehr hoher Wert
+    }
 
     // Debug-Log (kann bei Bedarf entfernt werden)
     console.log(`--- KOORDINATEN FÜR ${element.id} ---`);
@@ -540,6 +616,8 @@ function checkPosition(element, currentX, currentY) {
     const isCorrectY = Math.abs(currentY - targetY) < tolerance;
 
     if (isCorrectX && isCorrectY) {
+        piecePlacedCorrectly = true;
+        
         // POSITIVES Feedback & Einrasten (Location und Position sind richtig)
         feedbackElement.textContent = '🎉 Richtig! Gut gemacht.';
         feedbackElement.className = 'correct';
@@ -577,7 +655,7 @@ function checkPosition(element, currentX, currentY) {
         setTimeout(() => {
             feedbackElement.classList.add('hidden');
             feedbackElement.classList.remove('incorrect');
-            // Statischer Hint bleibt sichtbar
+            applyMobileScale(); // Skalierung wieder anwenden, wenn es falsch ist
         }, 1500);
     }
 }
@@ -607,6 +685,10 @@ function showAllSolutions(locationToShow) {
     if (staticDragHint) {
         staticDragHint.classList.add('hidden'); 
     }
+    
+    // NEU: Skalierung entfernen, da wir die volle Lösung in Originalgröße zeigen wollen
+    removeMobileScale(); 
+
 
     // 2. Iteriere über alle Puzzleteile und platziere sie
     document.querySelectorAll('.draggable').forEach(element => {
